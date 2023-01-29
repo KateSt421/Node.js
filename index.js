@@ -1,34 +1,45 @@
-const colors = require('colors')
+//1. Record 1
+//Record 5
+//Record 6
+//Record 2
 
-let primeCount = 0
+require('moment-precise-range-plugin');
+const moment = require('moment');
+const EventEmitter = require('events');
+const [dateStringInFuture] = process.argv.slice(2);
+const DATE_FORMAT_PATTERN = 'YYYY-MM-DD HH:mm:ss';
 
-let [primeStart, primeEnd] = process.argv.slice(2)
+const getDateFromDateString = (dateString) => {
+    const [hour, day, month, year] = dateString.split('-');
+    return new Date(Date.UTC(year, month - 1, day, hour));
+};
 
-const colorsPallete = [colors.green, colors.yellow, colors.red]
+const showRemainingTime = (dateInFuture) => {
+    const dateNow = new Date();
 
-if (!primeStart || !primeEnd) {
-    console.log(colors.red('Числа должны быть от 0 100'))
-} else {
-    if (primeStart < 2) {
-        primeStart = 2
+    if (dateNow >= dateInFuture) {
+        emmitter.emit('timerEnd');
+    } else {
+        const currentDateFormatted = moment(dateNow, DATE_FORMAT_PATTERN);
+        const futureDateFormatted = moment(dateInFuture, DATE_FORMAT_PATTERN);
+        const diff = moment.preciseDiff(currentDateFormatted, futureDateFormatted);
+
+        console.clear();
+        console.log(diff);
     }
+};
 
-    for (let i = primeStart; i <= primeEnd; i++) {
-        let isPrime = true
+const showTimerDone = (timerId) => {
+    clearInterval(timerId);
+    console.log('Таймер истек');
+};
+const emmitter = new EventEmitter();
+const dateInFuture = getDateFromDateString(dateStringInFuture);
+const timerId = setInterval(() => {
+    emmitter.emit('timerTick', dateInFuture);
+}, 1000)
 
-        for (let j = 2; j < i; j++) {
-            if (i % j === 0) {
-                isPrime = false
-            }
-        }
-
-        if (isPrime) {
-            console.log(colorsPallete[primeCount % 3](i))
-            primeCount++
-        }
-    }
-
-    if (!primeCount) {
-        console.log(colors.red('Не найдено простых чисел в диапазоне'))
-    }
-}
+emmitter.on('timerTick', showRemainingTime);
+emmitter.on('timerEnd', () => {
+    showTimerDone(timerId);
+});

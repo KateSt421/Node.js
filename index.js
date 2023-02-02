@@ -1,50 +1,61 @@
-const fs = require('fs')
-const readline = require('readline')
+const fs = require('fs');
+const path = require('path');
+const inquirer = require('inquirer');
 
-const readStream = fs.createReadStream('./access_tmp.log', 'utf8')
-const writeStream1 = fs.createWriteStream('./89.123.1.41_requests.log')
-const writeStream2 = fs.createWriteStream('./34.48.240.111_requests.log')
 
-const rl = readline.createInterface({
-    input: readStream,
-    terminal: true,
-})
 
-rl.on('line', line => {
-    if (line.includes('89.123.1.41')) {
-        writeStream1.write(line + '\n')
-    }
 
-    if (line.includes('34.48.240.111')) {
-        writeStream2.write(line + '\n')
-    }
-})
-const showRemainingTime = (dateInFuture) => {
-    const dateNow = new Date();
+const options = async () => {
+    const serchParams = { dirToSearch: '', pattern: '' };
 
-    if (dateNow >= dateInFuture) {
-        emmitter.emit('timerEnd');
+    const { thisDir } = await inquirer.prompt([{
+        name: 'thisDir',
+        type: 'confirm',
+        message: 'search here:',
+        describe: 'search here'
+    }]);
+
+    if (!thisDir) {
+        serchParams.dirToSearch = (await inquirer.prompt([{
+            name: 'dirToSearch',
+            type: 'input',
+            message: 'indicate the path: ',
+            describe: 'indicate the path'
+        }])).dirToSearch;
     } else {
-        const currentDateFormatted = moment(dateNow, DATE_FORMAT_PATTERN);
-        const futureDateFormatted = moment(dateInFuture, DATE_FORMAT_PATTERN);
-        const diff = moment.preciseDiff(currentDateFormatted, futureDateFormatted);
-
-        console.clear();
-        console.log(diff);
+        serchParams.dirToSearch = process.cwd();
     }
+
+    serchParams.pattern = (await inquirer.prompt([{
+        name: 'pattern',
+        type: 'input',
+        message: 'Pattern: ',
+        describe: 'Pattern'
+    }])).pattern;
+
+    return serchParams;
 };
 
-const showTimerDone = (timerId) => {
-    clearInterval(timerId);
-    console.log('Таймер истек');
-};
-const emmitter = new EventEmitter();
-const dateInFuture = getDateFromDateString(dateStringInFuture);
-const timerId = setInterval(() => {
-    emmitter.emit('timerTick', dateInFuture);
-}, 1000)
 
-emmitter.on('timerTick', showRemainingTime);
-emmitter.on('timerEnd', () => {
-    showTimerDone(timerId);
-});
+const dir = (dirPath) => fs.lstatSync(dirPath).isDirectory();
+
+
+const run = async () => {
+    const { dirToSearch, pattern } = await options();
+    const files = [];
+    const dirsToResearch = [];
+    dirsToResearch.push(dirToSearch);
+
+    while (dirsToResearch.length > 0) {
+        const currentDir = dirsToResearch.shift();
+        const dirContains = fs.readdirSync(currentDir);
+        const inDirFiles = dirContains.filter((fileName) => fileName.indexOf(pattern) !== -1);
+        const inDirDirs = dirContains.map((dirName) => path.join(currentDir, dirName)).filter(dir);
+        files.push(...inDirFiles);
+        dirsToResearch.push(...inDirDirs);
+    }
+
+    console.log(files);
+};
+
+run();

@@ -1,61 +1,63 @@
-const fs = require('fs');
-const path = require('path');
-const inquirer = require('inquirer');
+import http from "http";
+import fs from "fs";
+import path from "path";
+import { Transform } from "stream";
 
+const host = "localhost";
+const port = 5000;
 
+const list = [];
+const fsp = fs.promises;
 
-
-const options = async () => {
-    const serchParams = { dirToSearch: '', pattern: '' };
-
-    const { thisDir } = await inquirer.prompt([{
-        name: 'thisDir',
-        type: 'confirm',
-        message: 'search here:',
-        describe: 'search here'
-    }]);
-
-    if (!thisDir) {
-        serchParams.dirToSearch = (await inquirer.prompt([{
-            name: 'dirToSearch',
-            type: 'input',
-            message: 'indicate the path: ',
-            describe: 'indicate the path'
-        }])).dirToSearch;
-    } else {
-        serchParams.dirToSearch = process.cwd();
+const links = (arr, curUrl) => {
+    if (curUrl.endsWith("/")) curUrl = curUrl.substring(0, curUrl.length - 1);
+    let li = "";
+    for (const item of arr) {
+        li += `<li><a href="${curUrl}/${item}">${item}</a></li>`;
     }
-
-    serchParams.pattern = (await inquirer.prompt([{
-        name: 'pattern',
-        type: 'input',
-        message: 'Pattern: ',
-        describe: 'Pattern'
-    }])).pattern;
-
-    return serchParams;
+    return li;
 };
 
+const server = http.createServer((req, res) => {
+    if (req.method === "GET") {
+        const url = req.url.split("?")[0];
+        const curPath = path.join(process.cwd(), url);
 
-const dir = (dirPath) => fs.lstatSync(dirPath).isDirectory();
+        fs.stat(curPath, (err, stats) => {
+            if (!err) {
+                if (stats.isFile(curPath)) {
+                    const rs = fs.createReadStream(curPath, "utf-8");
+                    rs.pipe(res);
+                } else {
+                    fsp
+                        .readdir(curPath)
+                        .then((files) => {
+                            if (url !== "/") files.unshift("..");
+                            return files;
+                        })
+                        .then((data) => {
+                            // render
+                            const filePath = path.join(process.cwd(), "./index.html");
+                            const rs = fs.createReadStream(filePath);
+                            const ts = new Transform({
+                                transform(chunk, encoding, callback) {
+                                    const li = links(data, url);
+                                    this.push(chunk.toString().replace("The first html-page", li));
 
+                                    callback();
+                                },
+                            });
 
-const run = async () => {
-    const { dirToSearch, pattern } = await options();
-    const files = [];
-    const dirsToResearch = [];
-    dirsToResearch.push(dirToSearch);
-
-    while (dirsToResearch.length > 0) {
-        const currentDir = dirsToResearch.shift();
-        const dirContains = fs.readdirSync(currentDir);
-        const inDirFiles = dirContains.filter((fileName) => fileName.indexOf(pattern) !== -1);
-        const inDirDirs = dirContains.map((dirName) => path.join(currentDir, dirName)).filter(dir);
-        files.push(...inDirFiles);
-        dirsToResearch.push(...inDirDirs);
+                            rs.pipe(ts).pipe(res);
+                        });
+                }
+            } else {
+                res.end("Path not exists");
+            }
+        });
     }
+});
 
-    console.log(files);
-};
-
-run();
+server.listen(port, host, () =>
+    console.log(`Server running at http://${host}:${port}`)
+);

@@ -1,21 +1,24 @@
-//task 1. Record 1
-//Record 5
-//Record 6
-//Record 2
+const fs = require('fs')
+const readline = require('readline')
 
-//task 2
+const readStream = fs.createReadStream('./access_tmp.log', 'utf8')
+const writeStream1 = fs.createWriteStream('./89.123.1.41_requests.log')
+const writeStream2 = fs.createWriteStream('./34.48.240.111_requests.log')
 
-require('moment-precise-range-plugin');
-const moment = require('moment');
-const EventEmitter = require('events');
-const [dateStringInFuture] = process.argv.slice(2);
-const DATE_FORMAT_PATTERN = 'YYYY-MM-DD HH:mm:ss';
+const rl = readline.createInterface({
+    input: readStream,
+    terminal: true,
+})
 
-const getDateFromDateString = (dateString) => {
-    const [hour, day, month, year] = dateString.split('-');
-    return new Date(Date.UTC(year, month - 1, day, hour));
-};
+rl.on('line', line => {
+    if (line.includes('89.123.1.41')) {
+        writeStream1.write(line + '\n')
+    }
 
+    if (line.includes('34.48.240.111')) {
+        writeStream2.write(line + '\n')
+    }
+})
 const showRemainingTime = (dateInFuture) => {
     const dateNow = new Date();
 
